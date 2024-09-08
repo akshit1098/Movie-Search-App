@@ -6,6 +6,7 @@
 //
 
 import UIKit
+import SafariServices
 
 // Steps to follow:-
 // 1. UI - Table View to display the movie
@@ -25,6 +26,7 @@ class ViewController: UIViewController, UITextFieldDelegate, UITableViewDelegate
     override func viewDidLoad() {
         super.viewDidLoad()
         // Do any additional setup after loading the view.
+        table.register(MovieTableViewCell.nib(), forCellReuseIdentifier: MovieTableViewCell.identifier)
         table.delegate = self
         table.dataSource = self
         field.delegate = self
@@ -38,27 +40,48 @@ class ViewController: UIViewController, UITextFieldDelegate, UITableViewDelegate
     }
     
     func searchMovies() {
+        // keyboard of the field to go away
         field.resignFirstResponder()
         
         guard let text = field.text, !text.isEmpty else {
             return
         }
         
-        if let url = URL(string: "https://www.omdbapi.com/?i=tt3896198&apikey=ec4bd711&s=fast%20and&type=movie") {
+        let query = text.replacingOccurrences(of: " ", with: "%20")
+        
+        movies.removeAll()
+        
+        if let url = URL(string: "https://www.omdbapi.com/?i=tt3896198&apikey=ec4bd711&s=\(query)%20and&type=movie") {
             URLSession.shared.dataTask(with: url) { data, response, error in
                 guard let data = data, error == nil else {
                     return
                 }
                 
                 // Convert
+                var result: MovieResult?
+                do {
+                    result = try JSONDecoder().decode(MovieResult.self, from: data)
+                }
+                catch {
+                    print("error")
+                }
+                
+                guard let finalResult = result else {
+                    return
+                }
                 
                 
                 
                 // Update our movies array
+                let newMovies = finalResult.Search
+                self.movies.append(contentsOf: newMovies)
                 
                 
                 
                 // Refresh our table
+                DispatchQueue.main.async {
+                    self.table.reloadData()
+                }
                 
                 
             }.resume()
@@ -73,12 +96,18 @@ class ViewController: UIViewController, UITextFieldDelegate, UITableViewDelegate
     }
     
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        return UITableViewCell()
+        let cell = tableView.dequeueReusableCell(withIdentifier: MovieTableViewCell.identifier, for: indexPath) as! MovieTableViewCell
+        cell.configure(with: movies[indexPath.row])
+        return cell
+        
     }
     
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         tableView.deselectRow(at: indexPath, animated: true)
         //Show movie details
+        let url = "https://www.imdb.com/title/\(movies[indexPath.row].imdbID)"
+        let vc = SFSafariViewController(url: URL(string: url)!)
+        present(vc, animated: true)
     }
     
 
@@ -86,6 +115,7 @@ class ViewController: UIViewController, UITextFieldDelegate, UITableViewDelegate
 
 
 struct MovieResult: Codable{
+    let Search: [Movie]
     
 }
 
